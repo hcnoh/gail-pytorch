@@ -176,8 +176,9 @@ class GAIL:
             ep_obs = FloatTensor(ep_obs)
             ep_rwds = FloatTensor(ep_rwds)
 
+        exp_rwd_mean = np.mean(exp_rwd_iter)
         print(
-            "Expert Reward Mean: %f" % np.mean(exp_rwd_iter)
+            "Expert Reward Mean: %f" % exp_rwd_mean
         )
 
         exp_obs = FloatTensor(exp_obs)
@@ -400,4 +401,4 @@ class GAIL:
 
             set_params(self.pi, new_params)
 
-        return rwd_iter_means
+        return exp_rwd_mean, rwd_iter_means

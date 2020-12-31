@@ -1,10 +1,10 @@
 import torch
 
 if torch.cuda.is_available():
-    from torch.cuda import FloatTensor, LongTensor
+    from torch.cuda import FloatTensor
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
 else:
-    from torch import FloatTensor, LongTensor
+    from torch import FloatTensor
 
 
 class PolicyNetwork(torch.nn.Module):
