@@ -280,7 +280,7 @@ class GAIL:
 
                 gms.append(ep_gms)
 
-            rwd_iter_means.append(np.mean(exp_rwd_iter))
+            rwd_iter_means.append(np.mean(rwd_iter))
             print(
                 "Iterations: %i,   Reward Mean: %f"
                 % (i + 1, np.mean(rwd_iter))
