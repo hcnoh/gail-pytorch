@@ -125,12 +125,15 @@ class GAIL:
         num_iters = self.train_config["num_iters"]
         num_steps_per_iter = self.train_config["num_steps_per_iter"]
         horizon = self.train_config["horizon"]
-        gamma_ = self.train_config["gamma"]
         lambda_ = self.train_config["lambda"]
+        gae_gamma = self.train_config["gae_gamma"]
+        gae_lambda = self.train_config["gae_lambda"]
         eps = self.train_config["epsilon"]
         max_kl = self.train_config["max_kl"]
         cg_damping = self.train_config["cg_damping"]
         normalize_advantage = self.train_config["normalize_advantage"]
+
+        opt_d = torch.optim.Adam(self.d.parameters())
 
         exp_rwd_iter = []
 
@@ -180,188 +183,221 @@ class GAIL:
         exp_obs = FloatTensor(exp_obs)
         exp_acts = FloatTensor(np.array(exp_acts))
 
-        print(exp_obs.shape)
-        print(exp_acts.shape)
+        # print(exp_obs.shape)
+        # print(exp_acts.shape)
 
-        print(self.d(exp_obs, exp_acts).shape)
-        print(self.d(exp_obs, exp_acts))
-        print(self.d.get_logits(exp_obs, exp_acts))
+        # print(self.d(exp_obs, exp_acts).shape)
+        # print(self.d(exp_obs, exp_acts))
+        # print(self.d.get_logits(exp_obs, exp_acts))
 
-        # rwd_iter_means = []
-        # for i in range(num_iters):
-        #     rwd_iter = []
+        rwd_iter_means = []
+        for i in range(num_iters):
+            rwd_iter = []
 
-        #     exp_obs = []
-        #     exp_acts = []
-        #     rets = []
-        #     advs = []
-        #     gms = []
+            obs = []
+            acts = []
+            rets = []
+            advs = []
+            gms = []
 
-        #     steps = 0
-        #     while steps < num_steps_per_iter:
-        #         ep_obs = []
-        #         ep_rwds = []
+            steps = 0
+            while steps < num_steps_per_iter:
+                ep_obs = []
+                ep_acts = []
+                ep_rwds = []
+                ep_costs = []
+                ep_disc_costs = []
+                ep_gms = []
+                ep_lmbs = []
 
-        #         t = 0
-        #         done = False
+                t = 0
+                done = False
 
-        #         ob = env.reset()
+                ob = env.reset()
 
-        #         while not done and steps < num_steps_per_iter:
-        #             act = self.act(ob)
+                while not done and steps < num_steps_per_iter:
+                    act = self.act(ob)
 
-        #             ep_obs.append(ob)
-        #             exp_obs.append(ob)
-        #             exp_acts.append(act)
+                    ep_obs.append(ob)
+                    obs.append(ob)
 
-        #             if render:
-        #                 env.render()
-        #             ob, rwd, done, info = env.step(act)
+                    ep_acts.append(act)
+                    acts.append(act)
 
-        #             ep_rwds.append(rwd)
-        #             ep_disc_rwds.append(rwd * (gamma_ ** t))
-        #             ep_gms.append(gamma_ ** t)
-        #             ep_lmbs.append(lambda_ ** t)
+                    if render:
+                        env.render()
+                    ob, rwd, done, info = env.step(act)
 
-        #             t += 1
-        #             steps += 1
+                    ep_rwds.append(rwd)
+                    # ep_disc_rwds.append(rwd * (gae_gamma ** t))
+                    ep_gms.append(gae_gamma ** t)
+                    ep_lmbs.append(gae_lambda ** t)
 
-        #             if horizon is not None:
-        #                 if t >= horizon:
-        #                     break
+                    t += 1
+                    steps += 1
 
-        #         if done:
-        #             exp_rwd_iter.append(np.sum(ep_rwds))
+                    if horizon is not None:
+                        if t >= horizon:
+                            break
 
-        #         ep_obs = FloatTensor(ep_obs)
-        #         ep_rwds = FloatTensor(ep_rwds)
-        #         ep_disc_rwds = FloatTensor(ep_disc_rwds)
-        #         ep_gms = FloatTensor(ep_gms)
-        #         ep_lmbs = FloatTensor(ep_lmbs)
+                if done:
+                    rwd_iter.append(np.sum(ep_rwds))
 
-        #         ep_disc_rets = FloatTensor(
-        #             [sum(ep_disc_rwds[i:]) for i in range(t)]
-        #         )
-        #         ep_rets = ep_disc_rets / ep_gms
+                ep_obs = FloatTensor(ep_obs)
+                ep_acts = FloatTensor(np.array(ep_acts))
+                ep_rwds = FloatTensor(ep_rwds)
+                # ep_disc_rwds = FloatTensor(ep_disc_rwds)
+                ep_gms = FloatTensor(ep_gms)
+                ep_lmbs = FloatTensor(ep_lmbs)
 
-        #         rets.append(ep_rets)
+                ep_costs = (-1) * torch.log(self.d(ep_obs, ep_acts))\
+                    .squeeze().detach()
+                ep_disc_costs = ep_gms * ep_costs
 
-        #         self.v.eval()
-        #         curr_vals = self.v(ep_obs).detach()
-        #         next_vals = torch.cat(
-        #             (self.v(ep_obs)[1:], FloatTensor([[0.]]))
-        #         ).detach()
-        #         ep_deltas = ep_rwds.unsqueeze(-1)\
-        #             + gamma_ * next_vals\
-        #             - curr_vals
+                ep_disc_rets = FloatTensor(
+                    [sum(ep_disc_costs[i:]) for i in range(t)]
+                )
+                ep_rets = ep_disc_rets / ep_gms
 
-        #         ep_advs = torch.FloatTensor([
-        #             ((ep_gms * ep_lmbs)[:t - j].unsqueeze(-1) * ep_deltas[j:])
-        #             .sum()
-        #             for j in range(t)
-        #         ])
-        #         advs.append(ep_advs)
+                rets.append(ep_rets)
 
-        #         gms.append(ep_gms)
+                self.v.eval()
+                curr_vals = self.v(ep_obs).detach()
+                next_vals = torch.cat(
+                    (self.v(ep_obs)[1:], FloatTensor([[0.]]))
+                ).detach()
+                ep_deltas = ep_costs.unsqueeze(-1)\
+                    + gae_gamma * next_vals\
+                    - curr_vals
 
-        #     rwd_iter_means.append(np.mean(exp_rwd_iter))
-        #     print(
-        #         "Iterations: %i,   Expert Reward Mean: %f"
-        #         % (i + 1, np.mean(rwd_iter))
-        #     )
+                ep_advs = torch.FloatTensor([
+                    ((ep_gms * ep_lmbs)[:t - j].unsqueeze(-1) * ep_deltas[j:])
+                    .sum()
+                    for j in range(t)
+                ])
+                advs.append(ep_advs)
 
-            # obs = FloatTensor(obs)
-            # acts = FloatTensor(np.array(acts))
-            # rets = torch.cat(rets)
-            # advs = torch.cat(advs)
-            # gms = torch.cat(gms)
+                gms.append(ep_gms)
 
-            # if normalize_advantage:
-            #     advs = (advs - advs.mean()) / advs.std()
+            rwd_iter_means.append(np.mean(exp_rwd_iter))
+            print(
+                "Iterations: %i,   Reward Mean: %f"
+                % (i + 1, np.mean(rwd_iter))
+            )
 
-            # self.v.train()
-            # old_params = get_flat_params(self.v).detach()
-            # old_v = self.v(obs).detach()
+            obs = FloatTensor(obs)
+            acts = FloatTensor(np.array(acts))
+            rets = torch.cat(rets)
+            advs = torch.cat(advs)
+            gms = torch.cat(gms)
 
-            # def constraint():
-            #     return ((old_v - self.v(obs)) ** 2).mean()
+            if normalize_advantage:
+                advs = (advs - advs.mean()) / advs.std()
 
-            # grad_diff = get_flat_grads(constraint(), self.v)
+            self.d.train()
+            exp_scores = self.d.get_logits(exp_obs, exp_acts)
+            nov_scores = self.d.get_logits(obs, acts)
 
-            # def Hv(v):
-            #     hessian = get_flat_grads(torch.dot(grad_diff, v), self.v)\
-            #         .detach()
+            opt_d.zero_grad()
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(
+                exp_scores, torch.zeros_like(exp_scores)
+            ) \
+                + torch.nn.functional.binary_cross_entropy_with_logits(
+                    nov_scores, torch.ones_like(nov_scores)
+                )
+            loss.backward()
+            opt_d.step()
 
-            #     return hessian
+            self.v.train()
+            old_params = get_flat_params(self.v).detach()
+            old_v = self.v(obs).detach()
 
-            # g = get_flat_grads(
-            #     ((-1) * (self.v(obs).squeeze() - rets) ** 2).mean(), self.v
-            # ).detach()
-            # s = conjugate_gradient(Hv, g).detach()
+            def constraint():
+                return ((old_v - self.v(obs)) ** 2).mean()
 
-            # Hs = Hv(s).detach()
-            # alpha = torch.sqrt(2 * eps / torch.dot(s, Hs))
+            grad_diff = get_flat_grads(constraint(), self.v)
 
-            # new_params = old_params + alpha * s
+            def Hv(v):
+                hessian = get_flat_grads(torch.dot(grad_diff, v), self.v)\
+                    .detach()
 
-            # set_params(self.v, new_params)
+                return hessian
 
-            # self.pi.train()
-            # old_params = get_flat_params(self.pi).detach()
-            # old_distb = self.pi(obs)
+            g = get_flat_grads(
+                ((-1) * (self.v(obs).squeeze() - rets) ** 2).mean(), self.v
+            ).detach()
+            s = conjugate_gradient(Hv, g).detach()
 
-            # def L():
-            #     distb = self.pi(obs)
+            Hs = Hv(s).detach()
+            alpha = torch.sqrt(2 * eps / torch.dot(s, Hs))
 
-            #     return (advs * torch.exp(
-            #                 distb.log_prob(acts)
-            #                 - old_distb.log_prob(acts).detach()
-            #             )).mean()
+            new_params = old_params + alpha * s
 
-            # def kld():
-            #     distb = self.pi(obs)
+            set_params(self.v, new_params)
 
-            #     if self.discrete:
-            #         old_p = old_distb.probs.detach()
-            #         p = distb.probs
+            self.pi.train()
+            old_params = get_flat_params(self.pi).detach()
+            old_distb = self.pi(obs)
 
-            #         return (old_p * (torch.log(old_p) - torch.log(p)))\
-            #             .sum(-1)\
-            #             .mean()
+            def L():
+                distb = self.pi(obs)
 
-            #     else:
-            #         old_mean = old_distb.mean.detach()
-            #         old_cov = old_distb.covariance_matrix.sum(-1).detach()
-            #         mean = distb.mean
-            #         cov = distb.covariance_matrix.sum(-1)
+                return (advs * torch.exp(
+                            distb.log_prob(acts)
+                            - old_distb.log_prob(acts).detach()
+                        )).mean()
 
-            #         return (0.5) * (
-            #                 (old_cov / cov).sum(-1)
-            #                 + (((old_mean - mean) ** 2) / cov).sum(-1)
-            #                 - self.action_dim
-            #                 + torch.log(cov).sum(-1)
-            #                 - torch.log(old_cov).sum(-1)
-            #             ).mean()
+            def kld():
+                distb = self.pi(obs)
 
-            # grad_kld_old_param = get_flat_grads(kld(), self.pi)
+                if self.discrete:
+                    old_p = old_distb.probs.detach()
+                    p = distb.probs
 
-            # def Hv(v):
-            #     hessian = get_flat_grads(
-            #         torch.dot(grad_kld_old_param, v),
-            #         self.pi
-            #     ).detach()
+                    return (old_p * (torch.log(old_p) - torch.log(p)))\
+                        .sum(-1)\
+                        .mean()
 
-            #     return hessian + cg_damping * v
+                else:
+                    old_mean = old_distb.mean.detach()
+                    old_cov = old_distb.covariance_matrix.sum(-1).detach()
+                    mean = distb.mean
+                    cov = distb.covariance_matrix.sum(-1)
 
-            # g = get_flat_grads(L(), self.pi).detach()
+                    return (0.5) * (
+                            (old_cov / cov).sum(-1)
+                            + (((old_mean - mean) ** 2) / cov).sum(-1)
+                            - self.action_dim
+                            + torch.log(cov).sum(-1)
+                            - torch.log(old_cov).sum(-1)
+                        ).mean()
 
-            # s = conjugate_gradient(Hv, g).detach()
-            # Hs = Hv(s).detach()
+            grad_kld_old_param = get_flat_grads(kld(), self.pi)
 
-            # new_params = rescale_and_linesearch(
-            #     g, s, Hs, max_kl, L, kld, old_params, self.pi
-            # )
+            def Hv(v):
+                hessian = get_flat_grads(
+                    torch.dot(grad_kld_old_param, v),
+                    self.pi
+                ).detach()
 
-            # set_params(self.pi, new_params)
+                return hessian + cg_damping * v
 
-        # return rwd_iter_means
+            g = get_flat_grads(L(), self.pi).detach()
+
+            s = conjugate_gradient(Hv, g).detach()
+            Hs = Hv(s).detach()
+
+            new_params = rescale_and_linesearch(
+                g, s, Hs, max_kl, L, kld, old_params, self.pi
+            )
+
+            disc_causal_entropy = ((-1) * gms * self.pi(obs).log_prob(acts))\
+                .mean()
+            grad_disc_causal_entropy = get_flat_grads(
+                disc_causal_entropy, self.pi
+            )
+            new_params += lambda_ * grad_disc_causal_entropy
+
+            set_params(self.pi, new_params)
+
+        return rwd_iter_means
