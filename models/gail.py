@@ -184,13 +184,6 @@ class GAIL:
         exp_obs = FloatTensor(exp_obs)
         exp_acts = FloatTensor(np.array(exp_acts))
 
-        # print(exp_obs.shape)
-        # print(exp_acts.shape)
-
-        # print(self.d(exp_obs, exp_acts).shape)
-        # print(self.d(exp_obs, exp_acts))
-        # print(self.d.get_logits(exp_obs, exp_acts))
-
         rwd_iter_means = []
         for i in range(num_iters):
             rwd_iter = []
@@ -230,7 +223,6 @@ class GAIL:
                     ob, rwd, done, info = env.step(act)
 
                     ep_rwds.append(rwd)
-                    # ep_disc_rwds.append(rwd * (gae_gamma ** t))
                     ep_gms.append(gae_gamma ** t)
                     ep_lmbs.append(gae_lambda ** t)
 
