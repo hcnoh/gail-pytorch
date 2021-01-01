@@ -3,7 +3,7 @@
         "num_iters": 200,
         "num_steps_per_iter": 2000,
         "horizon": null,
-        "lambda": 0,
+        "lambda": 1e-3,
         "gae_gamma": 0.99,
         "gae_lambda": 0.99,
         "epsilon": 0.01,
