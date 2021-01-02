@@ -86,7 +86,7 @@ class Discriminator(torch.nn.Module):
         )
 
     def forward(self, states, actions):
-        return torch.nn.functional.sigmoid(self.get_logits(states, actions))
+        return torch.sigmoid(self.get_logits(states, actions))
 
     def get_logits(self, states, actions):
         if self.discrete:
