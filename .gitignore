@@ -131,3 +131,6 @@ dmypy.json
 # custom directories
 .ckpts
 .vscode
+
+# custom files
+results.ipynb
