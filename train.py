@@ -67,6 +67,8 @@ def main(env_name, gpu_num):
         torch.save(model.pi.state_dict(), ckpt_path + "policy.ckpt")
     if hasattr(model, "v"):
         torch.save(model.v.state_dict(), ckpt_path + "value.ckpt")
+    if hasattr(model, "d"):
+        torch.save(model.d.state_dict(), ckpt_path + "discriminator.ckpt")
 
 
 if __name__ == "__main__":
