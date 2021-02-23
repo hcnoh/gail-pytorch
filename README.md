@@ -31,11 +31,15 @@ In this repository, [OpenAI Gym](https://gym.openai.com/) environments such as `
 
 ## The results of CartPole environment
 
-![](/assets/img/README/README_2021-01-01-22-25-19.png)
+![](/assets/img/README/README_2021-02-23-23-47-07.png)
+
+## The results of Pendulum environment
+
+![](/assets/img/README/README_2021-02-23-23-47-28.png)
 
 ## The results of BipedalWalker environment
 
-![](/assets/img/README/README_2021-01-01-22-25-31.png)
+![](/assets/img/README/README_2021-02-23-23-48-04.png)
 
 - This result suggests that the causal entropy has little effect on the performance.
 

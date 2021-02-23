@@ -60,15 +60,15 @@ def main(env_name, gpu_num):
 
     env.close()
 
-    with open(ckpt_path + "results.pkl", "wb") as f:
+    with open(ckpt_path + "results_9.pkl", "wb") as f:
         pickle.dump(results, f)
 
     if hasattr(model, "pi"):
-        torch.save(model.pi.state_dict(), ckpt_path + "policy.ckpt")
+        torch.save(model.pi.state_dict(), ckpt_path + "policy_9.ckpt")
     if hasattr(model, "v"):
-        torch.save(model.v.state_dict(), ckpt_path + "value.ckpt")
+        torch.save(model.v.state_dict(), ckpt_path + "value_9.ckpt")
     if hasattr(model, "d"):
-        torch.save(model.d.state_dict(), ckpt_path + "discriminator.ckpt")
+        torch.save(model.d.state_dict(), ckpt_path + "discriminator_9.ckpt")
 
 
 if __name__ == "__main__":
