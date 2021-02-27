@@ -35,7 +35,7 @@ In this repository, [OpenAI Gym](https://gym.openai.com/) environments such as `
 
 ## The results of Pendulum environment
 
-![](/assets/img/README/README_2021-02-23-23-47-28.png)
+![](/assets/img/README/README_2021-02-27-22-24-07.png)
 
 ## The results of BipedalWalker environment
 
