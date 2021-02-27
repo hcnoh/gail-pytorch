@@ -49,5 +49,4 @@ In this repository, [OpenAI Gym](https://gym.openai.com/) environments such as `
 
 ## References
 - The original GAIL paper: [link](https://arxiv.org/abs/1606.03476)
-- The definition of discounted causal entropy: [link](https://aviationsystemsdivision.arc.nasa.gov/publications/2015/IEEE-CDC2014_Bloem.pdf)
 - Reinforcement Learning Collection with PyTorch: [link](https://github.com/hcnoh/rl-collection-pytorch)
