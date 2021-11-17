@@ -130,6 +130,7 @@ dmypy.json
 
 # custom directories
 .ckpts
+ckpts
 .vscode
 
 # custom files

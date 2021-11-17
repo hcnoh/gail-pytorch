@@ -10,28 +10,30 @@ from models.nets import Expert
 from models.gail import GAIL
 
 
-def main(env_name, gpu_num):
-    if not os.path.isdir(".ckpts"):
-        os.mkdir(".ckpts")
+def main(env_name):
+    ckpt_path = "ckpts"
+    if not os.path.isdir(ckpt_path):
+        os.mkdir(ckpt_path)
 
     if env_name not in ["CartPole-v1", "Pendulum-v0", "BipedalWalker-v3"]:
         print("The environment name is wrong!")
         return
 
-    expert_ckpt_path = "experts/%s/" % env_name
+    expert_ckpt_path = "experts"
+    expert_ckpt_path = os.path.join(expert_ckpt_path, env_name)
 
     print(expert_ckpt_path)
-    with open(expert_ckpt_path + "model_config.json") as f:
+    with open(os.path.join(expert_ckpt_path, "model_config.json")) as f:
         expert_config = json.load(f)
 
-    ckpt_path = ".ckpts/%s/" % env_name
+    ckpt_path = os.path.join(ckpt_path, env_name)
     if not os.path.isdir(ckpt_path):
         os.mkdir(ckpt_path)
 
     with open("config.json") as f:
         config = json.load(f)[env_name]
 
-    with open(ckpt_path + "model_config.json", "w") as f:
+    with open(os.path.join(ckpt_path, "model_config.json"), "w") as f:
         json.dump(config, f, indent=4)
 
     env = gym.make(env_name)
@@ -47,28 +49,41 @@ def main(env_name, gpu_num):
         discrete = False
         action_dim = env.action_space.shape[0]
 
-    expert = Expert(state_dim, action_dim, discrete, **expert_config)
-    expert.pi.load_state_dict(torch.load(expert_ckpt_path + "policy.ckpt"))
-
-    model = GAIL(state_dim, action_dim, discrete, config)
-
     if torch.cuda.is_available():
-        with torch.cuda.device(gpu_num):
-            results = model.train(env, expert)
+        device = "cuda"
     else:
-        results = model.train(env, expert)
+        device = "cpu"
+
+    expert = Expert(
+        state_dim, action_dim, discrete, **expert_config
+    ).to(device)
+    expert.pi.load_state_dict(
+        torch.load(
+            os.path.join(expert_ckpt_path, "policy.ckpt"), map_location=device
+        )
+    )
+
+    model = GAIL(state_dim, action_dim, discrete, config).to(device)
+
+    results = model.train(env, expert)
 
     env.close()
 
-    with open(ckpt_path + "results.pkl", "wb") as f:
+    with open(os.path.join(ckpt_path, "results.pkl"), "wb") as f:
         pickle.dump(results, f)
 
     if hasattr(model, "pi"):
-        torch.save(model.pi.state_dict(), ckpt_path + "policy.ckpt")
+        torch.save(
+            model.pi.state_dict(), os.path.join(ckpt_path, "policy.ckpt")
+        )
     if hasattr(model, "v"):
-        torch.save(model.v.state_dict(), ckpt_path + "value.ckpt")
+        torch.save(
+            model.v.state_dict(), os.path.join(ckpt_path, "value.ckpt")
+        )
     if hasattr(model, "d"):
-        torch.save(model.d.state_dict(), ckpt_path + "discriminator.ckpt")
+        torch.save(
+            model.d.state_dict(), os.path.join(ckpt_path, "discriminator.ckpt")
+        )
 
 
 if __name__ == "__main__":
@@ -80,13 +95,6 @@ if __name__ == "__main__":
         help="Type the environment name to run. \
             The possible environments are \
                 [CartPole-v1, Pendulum-v0, BipedalWalker-v3]"
-    )
-    parser.add_argument(
-        "--gpu_num",
-        type=int,
-        default=0,
-        help="Type the number of the GPU of your GPU mahine \
-            you want to use if possible"
     )
     args = parser.parse_args()
 
