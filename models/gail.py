@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 
+from torch.nn import Module
+
 from models.nets import PolicyNetwork, ValueNetwork, Discriminator
 from utils.funcs import get_flat_grads, get_flat_params, set_params, \
     conjugate_gradient, rescale_and_linesearch
@@ -12,14 +14,16 @@ else:
     from torch import FloatTensor
 
 
-class GAIL:
+class GAIL(Module):
     def __init__(
         self,
         state_dim,
         action_dim,
         discrete,
         train_config=None
-    ):
+    ) -> None:
+        super().__init__()
+
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
@@ -29,10 +33,6 @@ class GAIL:
         self.v = ValueNetwork(self.state_dim)
 
         self.d = Discriminator(self.state_dim, self.action_dim, self.discrete)
-
-        if torch.cuda.is_available():
-            for net in self.get_networks():
-                net.to(torch.device("cuda"))
 
     def get_networks(self):
         return [self.pi, self.v]
@@ -99,7 +99,7 @@ class GAIL:
             if done:
                 exp_rwd_iter.append(np.sum(ep_rwds))
 
-            ep_obs = FloatTensor(ep_obs)
+            ep_obs = FloatTensor(np.array(ep_obs))
             ep_rwds = FloatTensor(ep_rwds)
 
         exp_rwd_mean = np.mean(exp_rwd_iter)
@@ -107,7 +107,7 @@ class GAIL:
             "Expert Reward Mean: {}".format(exp_rwd_mean)
         )
 
-        exp_obs = FloatTensor(exp_obs)
+        exp_obs = FloatTensor(np.array(exp_obs))
         exp_acts = FloatTensor(np.array(exp_acts))
 
         rwd_iter_means = []
@@ -162,7 +162,7 @@ class GAIL:
                 if done:
                     rwd_iter.append(np.sum(ep_rwds))
 
-                ep_obs = FloatTensor(ep_obs)
+                ep_obs = FloatTensor(np.array(ep_obs))
                 ep_acts = FloatTensor(np.array(ep_acts))
                 ep_rwds = FloatTensor(ep_rwds)
                 # ep_disc_rwds = FloatTensor(ep_disc_rwds)
@@ -189,7 +189,7 @@ class GAIL:
                     + gae_gamma * next_vals\
                     - curr_vals
 
-                ep_advs = torch.FloatTensor([
+                ep_advs = FloatTensor([
                     ((ep_gms * ep_lmbs)[:t - j].unsqueeze(-1) * ep_deltas[j:])
                     .sum()
                     for j in range(t)
@@ -204,7 +204,7 @@ class GAIL:
                 .format(i + 1, np.mean(rwd_iter))
             )
 
-            obs = FloatTensor(obs)
+            obs = FloatTensor(np.array(obs))
             acts = FloatTensor(np.array(acts))
             rets = torch.cat(rets)
             advs = torch.cat(advs)
