@@ -22,7 +22,6 @@ def main(env_name):
     expert_ckpt_path = "experts"
     expert_ckpt_path = os.path.join(expert_ckpt_path, env_name)
 
-    print(expert_ckpt_path)
     with open(os.path.join(expert_ckpt_path, "model_config.json")) as f:
         expert_config = json.load(f)
 
@@ -38,8 +37,6 @@ def main(env_name):
 
     env = gym.make(env_name)
     env.reset()
-
-    print(env.action_space)
 
     state_dim = len(env.observation_space.high)
     if env_name in ["CartPole-v1"]:
