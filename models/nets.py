@@ -1,5 +1,8 @@
 import torch
 
+from torch.nn import Module, Sequential, Linear, Tanh, Parameter, Embedding
+from torch.distributions import Categorical, MultivariateNormal
+
 if torch.cuda.is_available():
     from torch.cuda import FloatTensor
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
@@ -7,17 +10,18 @@ else:
     from torch import FloatTensor
 
 
-class PolicyNetwork(torch.nn.Module):
-    def __init__(self, state_dim, action_dim, discrete):
-        super(PolicyNetwork, self).__init__()
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(state_dim, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, action_dim),
+class PolicyNetwork(Module):
+    def __init__(self, state_dim, action_dim, discrete) -> None:
+        super().__init__()
+
+        self.net = Sequential(
+            Linear(state_dim, 50),
+            Tanh(),
+            Linear(50, 50),
+            Tanh(),
+            Linear(50, 50),
+            Tanh(),
+            Linear(50, action_dim),
         )
 
         self.state_dim = state_dim
@@ -25,64 +29,65 @@ class PolicyNetwork(torch.nn.Module):
         self.discrete = discrete
 
         if not self.discrete:
-            self.log_std = torch.nn.Parameter(torch.zeros(action_dim))
+            self.log_std = Parameter(torch.zeros(action_dim))
 
     def forward(self, states):
         if self.discrete:
-            probs = torch.nn.functional.softmax(self.net(states))
-            distb = torch.distributions.Categorical(probs)
+            probs = torch.softmax(self.net(states), dim=-1)
+            distb = Categorical(probs)
         else:
             mean = self.net(states)
 
             std = torch.exp(self.log_std)
             cov_mtx = torch.eye(self.action_dim) * (std ** 2)
 
-            distb = torch.distributions.MultivariateNormal(mean, cov_mtx)
+            distb = MultivariateNormal(mean, cov_mtx)
 
         return distb
 
 
-class ValueNetwork(torch.nn.Module):
-    def __init__(self, state_dim):
-        super(ValueNetwork, self).__init__()
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(state_dim, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 1),
+class ValueNetwork(Module):
+    def __init__(self, state_dim) -> None:
+        super().__init__()
+
+        self.net = Sequential(
+            Linear(state_dim, 50),
+            Tanh(),
+            Linear(50, 50),
+            Tanh(),
+            Linear(50, 50),
+            Tanh(),
+            Linear(50, 1),
         )
 
     def forward(self, states):
         return self.net(states)
 
 
-class Discriminator(torch.nn.Module):
-    def __init__(self, state_dim, action_dim, discrete):
-        super(Discriminator, self).__init__()
+class Discriminator(Module):
+    def __init__(self, state_dim, action_dim, discrete) -> None:
+        super().__init__()
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
 
         if self.discrete:
-            self.act_emb = torch.nn.Embedding(
+            self.act_emb = Embedding(
                 action_dim, state_dim
             )
             self.net_in_dim = 2 * state_dim
         else:
             self.net_in_dim = state_dim + action_dim
 
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(self.net_in_dim, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 50),
-            torch.nn.Tanh(),
-            torch.nn.Linear(50, 1),
+        self.net = Sequential(
+            Linear(self.net_in_dim, 50),
+            Tanh(),
+            Linear(50, 50),
+            Tanh(),
+            Linear(50, 50),
+            Tanh(),
+            Linear(50, 1),
         )
 
     def forward(self, states, actions):
@@ -97,24 +102,22 @@ class Discriminator(torch.nn.Module):
         return self.net(sa)
 
 
-class Expert:
+class Expert(Module):
     def __init__(
         self,
         state_dim,
         action_dim,
         discrete,
         train_config=None
-    ):
+    ) -> None:
+        super().__init__()
+
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.discrete = discrete
         self.train_config = train_config
 
         self.pi = PolicyNetwork(self.state_dim, self.action_dim, self.discrete)
-
-        if torch.cuda.is_available():
-            for net in self.get_networks():
-                net.to(torch.device("cuda"))
 
     def get_networks(self):
         return [self.pi]
