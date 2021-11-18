@@ -94,6 +94,7 @@ class GAIL(Module):
 
                 if horizon is not None:
                     if t >= horizon:
+                        done = True
                         break
 
             if done:
