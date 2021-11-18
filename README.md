@@ -48,6 +48,7 @@ In this repository, [OpenAI Gym](https://gym.openai.com/) environments such as `
 ## Recent Works
 - The CUDA usage is provided now.
 - Modified some errors in GAE.
+- Modified some errors about horizon was corrected.
 
 ## Future Works
 - Search other environments to running the algorithms
